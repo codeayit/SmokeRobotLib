@@ -77,7 +77,7 @@ public class ModbusMaster {
             request.writeInt16(quantity_of_x);
             request.writeInt8(4);
             request.writeInt16((output_value>>16));
-            request.writeInt16(output_value);
+            request.writeInt16(output_value) ;
             expected_length = 8;
         }else {
             throw new ModbusError(ModbusErrorType.ModbusFunctionNotSupportedError, "Not support function " + function_code);
