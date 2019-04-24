@@ -89,7 +89,7 @@ public class ModbusMaster {
         request.writeInt16Reversal(crc);
         // 发送到设备
         bytes = request.toByteArray();
-        Log.d(TAG, "send:" + ByteUtil.ByteArrToHex(bytes));
+//        Log.d(TAG, "send:" + ByteUtil.ByteArrToHex(bytes));
         port.getOutputStream().write(bytes);
         // 从设备接收反馈
         byte[] responseBytes;
@@ -138,7 +138,7 @@ public class ModbusMaster {
                 }
                 responseBytes = responseBytes_temp;
             }
-            Log.d(TAG, "receive:" + ByteUtil.ByteArrToHex(responseBytes));
+//            Log.d(TAG, "receive:" + ByteUtil.ByteArrToHex(responseBytes));
         }
 
         if (responseBytes == null || responseBytes.length != expected_length) {
