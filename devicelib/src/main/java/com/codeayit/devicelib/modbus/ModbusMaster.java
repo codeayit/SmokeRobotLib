@@ -7,7 +7,6 @@ import com.codeayit.devicelib.modbus.exception.ModbusError;
 import com.codeayit.devicelib.modbus.exception.ModbusErrorType;
 import com.codeayit.devicelib.utilities.ByteArrayReader;
 import com.codeayit.devicelib.utilities.ByteArrayWriter;
-import com.codeayit.devicelib.utilities.ByteUtil;
 import com.codeayit.devicelib.utilities.CRC16;
 import com.codeayit.devicelib.utilities.ThreadUtil;
 import com.codeayit.devicelib.utilities.TimeoutUtil;
@@ -70,9 +69,16 @@ public class ModbusMaster {
             request.writeInt8(function_code);
             request.writeInt16(starting_address);
             request.writeInt16(output_value);
-
             expected_length = 8;
-        } else {
+        } else if (function_code == ModbusFunction.WRITE_SINGLE_REGISTERS){
+            request.writeInt8(function_code);
+            request.writeInt16(starting_address);
+            request.writeInt16(quantity_of_x);
+            request.writeInt8(4);
+            request.writeInt16(output_value);
+            request.writeInt16((output_value>>16));
+            expected_length = 8;
+        }else {
             throw new ModbusError(ModbusErrorType.ModbusFunctionNotSupportedError, "Not support function " + function_code);
         }
 
@@ -82,13 +88,12 @@ public class ModbusMaster {
         request.writeInt16Reversal(crc);
         // 发送到设备
         bytes = request.toByteArray();
-//        Log.d(TAG, "send:"+ ByteUtil.ByteArrToHex(bytes));
+//        Log.d(TAG, "send:" + ByteUtil.ByteArrToHex(bytes));
         port.getOutputStream().write(bytes);
         // 从设备接收反馈
         byte[] responseBytes;
         try (ByteArrayWriter response = new ByteArrayWriter()) {
-//            ThreadUtil.sleep(150);
-            ThreadUtil.sleep(30);
+            ThreadUtil.sleep(100);
             final int finalExpected_length = expected_length;
             final boolean[] complete = new boolean[1];
             boolean done = TimeoutUtil.execute(new Runnable() {
@@ -115,43 +120,28 @@ public class ModbusMaster {
             }, timeout);
             complete[0] = true;
             response.flush();
-
             if (!done) {
                 throw new ModbusError(ModbusErrorType.ModbusTimeoutError, String.format("Timeout of %d ms.", timeout));
             }
             responseBytes = response.toByteArray();
-
-
-            if (responseBytes.length!=expected_length){
-//                Log.d(TAG, "receive_temp:"+ByteUtil.ByteArrToHex(responseBytes));
-
-//                int ignoreLength = 0;
-//                ByteArrayOutputStream out = new ByteArrayOutputStream();
-//                for (int i=0;i<responseBytes.length;i++){
-//                        if (responseBytes[i]!=ByteUtil.HexToByte("FF")){
-//                            ignoreLength = i;
-//                            break;
-//                        }
-//                }
-
-                responseBytes = ByteUtil.HexToByteArr(ByteUtil.ByteArrToHex(responseBytes).replaceAll("FF","").replaceAll(" ","").trim());
-
-//                out.write(responseBytes,ignoreLength,responseBytes.length-ignoreLength);
-//                responseBytes =  out.toByteArray();
-
-//                byte[] responseBytesTemp = new byte[responseBytes.length-7];
-//
-//                for (int i=0;i<expected_length;i++){
-//                    responseBytesTemp[i]=responseBytes[responseBytes.length-expected_length+i];
-//                }
-
-
+            if (responseBytes.length != expected_length) {
+//                Log.d(TAG, "receive_temp:" + ByteUtil.ByteArrToHex(responseBytes));
+                byte[] responseBytes_temp = new byte[expected_length];
+                for (int i = 0; i < responseBytes.length; i++) {
+                    if (responseBytes[i] == slave) {
+                        for (int j = 0; j < expected_length; j++) {
+                            responseBytes_temp[j] = responseBytes[i + j];
+                        }
+                        break;
+                    }
+                }
+                responseBytes = responseBytes_temp;
             }
-//            Log.d(TAG, "receive:"+ByteUtil.ByteArrToHex(responseBytes));
+//            Log.d(TAG, "receive:" + ByteUtil.ByteArrToHex(responseBytes));
         }
 
         if (responseBytes == null || responseBytes.length != expected_length) {
-            throw new ModbusError(ModbusErrorType.ModbusInvalidResponseError, "Response length is invalid " + responseBytes.length + " not "+expected_length);
+            throw new ModbusError(ModbusErrorType.ModbusInvalidResponseError, "Response length is invalid " + responseBytes.length + " not " + expected_length);
         }
 
         ByteArrayReader reader = new ByteArrayReader(responseBytes);
@@ -220,13 +210,13 @@ public class ModbusMaster {
     }
 
     public void writeSingleRegister(int slave, int address, int value) throws IOException, ModbusError {
-        Log.d(TAG,"writeSingleRegister slave="+slave+" addres="+address+" value="+value);
         execute(slave, ModbusFunction.WRITE_SINGLE_REGISTER, address, 1, value);
+        Log.d(TAG, "writeSingleRegister slave=" + slave + " address=" + address + " value=" + value);
     }
 
-    public void writeSingleRegister32(int slave, int addrress, int value) throws IOException, ModbusError{
-        this.execute(slave, ModbusFunction.WRITE_HOLDING_REGISTERS, addrress, 2, value);
-        Log.d("modbus_rtu", "writeSingleRegister32 slave=" + slave + " address=" + addrress + " value=" + value);
+    public void writeSingleRegister32(int slave, int address, int value) throws IOException, ModbusError {
+        execute(slave, ModbusFunction.WRITE_SINGLE_REGISTERS, address, 2, value);
+        Log.d(TAG, "writeSingleRegister32 slave=" + slave + " address=" + address + " value=" + value);
     }
 
     public boolean readCoil(int slave, int address) throws IOException, ModbusError {
@@ -236,25 +226,44 @@ public class ModbusMaster {
 
     public int readHoldingRegister(int slave, int address) throws IOException, ModbusError {
         int[] values = readHoldingRegisters(slave, address, 1);
-        Log.d(TAG,"readHoldingRegister slave="+slave+" addres="+address+" value="+values[0]);
+        Log.d(TAG, "readHoldingRegister slave=" + slave + " address=" + address + " value=" + values[0]);
         return values[0];
     }
 
-    public int readHoldingRegister32(int slave, int address)throws IOException, ModbusError {
-        int[] values = readHoldingRegisters(slave,address, 2);
+    public int readHoldingRegister32(int slave, int address) throws IOException, ModbusError {
+        int[] values = readHoldingRegisters(slave, address, 2);
+
         StringBuilder sb = new StringBuilder();
 
-        int value;
-        for(value = values.length - 1; value >= 0; --value) {
-            sb.append(this.hexNumber(values[value]));
+        for (int i = values.length-1; i >=0; i--) {
+            sb.append(shortToHexStr(values[i]));
         }
-        Log.d("modbus_rtu", "readHoldingRegister32 : " + sb.toString());
-        value = Long.valueOf(sb.toString(), 16).intValue();
-        Log.d("modbus_rtu", "readHoldingRegister32 slave=" + slave + " address=" + address + " value=" + value);
+
+        Log.d(TAG, "readHoldingRegister32 : " + sb.toString());
+
+        int value = Long.valueOf(sb.toString(), 16).intValue();
+        Log.d(TAG, "readHoldingRegister32 slave=" + slave + " address=" + address + " value=" + value);
+
         return value;
     }
 
-
+    private String shortToHexStr(int number){
+        String hex = Integer.toHexString(number);
+        switch (hex.length()){
+            case 1:
+                hex = "000"+hex;
+                break;
+            case 2:
+                hex = "00"+hex;
+                break;
+            case 3:
+                hex = "0"+hex;
+                break;
+            case 4:
+                break;
+        }
+        return hex;
+    }
 
     public int readInputRegister(int slave, int address) throws IOException, ModbusError {
         int[] values = readInputRegisters(slave, address, 1);
@@ -264,22 +273,5 @@ public class ModbusMaster {
     public boolean readInput(int slave, int address) throws IOException, ModbusError {
         int[] values = readInputs(slave, address, 1);
         return values[0] > 0;
-    }
-
-    private String hexNumber(int number) {
-        String numberStr = Integer.toHexString(number);
-        switch(numberStr.length()) {
-            case 1:
-                numberStr = "000" + numberStr;
-                break;
-            case 2:
-                numberStr = "00" + numberStr;
-                break;
-            case 3:
-                numberStr = "0" + numberStr;
-            case 4:
-        }
-
-        return numberStr;
     }
 }

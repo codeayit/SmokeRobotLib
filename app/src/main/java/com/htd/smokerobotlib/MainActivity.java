@@ -18,7 +18,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         try {
-            MbManager.getInstance().init(this,8,"",9600);
+            MbManager.getInstance().init(this,1,"",9600);
         } catch (Exception e) {
             e.printStackTrace();
         }
