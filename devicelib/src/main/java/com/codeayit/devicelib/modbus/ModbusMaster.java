@@ -7,6 +7,7 @@ import com.codeayit.devicelib.modbus.exception.ModbusError;
 import com.codeayit.devicelib.modbus.exception.ModbusErrorType;
 import com.codeayit.devicelib.utilities.ByteArrayReader;
 import com.codeayit.devicelib.utilities.ByteArrayWriter;
+import com.codeayit.devicelib.utilities.ByteUtil;
 import com.codeayit.devicelib.utilities.CRC16;
 import com.codeayit.devicelib.utilities.ThreadUtil;
 import com.codeayit.devicelib.utilities.TimeoutUtil;
@@ -75,8 +76,8 @@ public class ModbusMaster {
             request.writeInt16(starting_address);
             request.writeInt16(quantity_of_x);
             request.writeInt8(4);
-            request.writeInt16(output_value);
             request.writeInt16((output_value>>16));
+            request.writeInt16(output_value);
             expected_length = 8;
         }else {
             throw new ModbusError(ModbusErrorType.ModbusFunctionNotSupportedError, "Not support function " + function_code);
@@ -88,7 +89,7 @@ public class ModbusMaster {
         request.writeInt16Reversal(crc);
         // 发送到设备
         bytes = request.toByteArray();
-//        Log.d(TAG, "send:" + ByteUtil.ByteArrToHex(bytes));
+        Log.d(TAG, "send:" + ByteUtil.ByteArrToHex(bytes));
         port.getOutputStream().write(bytes);
         // 从设备接收反馈
         byte[] responseBytes;
@@ -121,7 +122,7 @@ public class ModbusMaster {
             complete[0] = true;
             response.flush();
             if (!done) {
-                throw new ModbusError(ModbusErrorType.ModbusTimeoutError, String.format("Timeout of %d ms.", timeout));
+                throw new ModbusError(ModbusErrorType.ModbusTimeoutError, String.format("Timeout of %d ms. ", timeout));
             }
             responseBytes = response.toByteArray();
             if (responseBytes.length != expected_length) {
@@ -137,7 +138,7 @@ public class ModbusMaster {
                 }
                 responseBytes = responseBytes_temp;
             }
-//            Log.d(TAG, "receive:" + ByteUtil.ByteArrToHex(responseBytes));
+            Log.d(TAG, "receive:" + ByteUtil.ByteArrToHex(responseBytes));
         }
 
         if (responseBytes == null || responseBytes.length != expected_length) {
@@ -216,7 +217,7 @@ public class ModbusMaster {
 
     public void writeSingleRegister32(int slave, int address, int value) throws IOException, ModbusError {
         execute(slave, ModbusFunction.WRITE_SINGLE_REGISTERS, address, 2, value);
-        Log.d(TAG, "writeSingleRegister32 slave=" + slave + " address=" + address + " value=" + value);
+        Log.d(TAG, "writeSingleRegister32 slave=" + slave + " address=" + address + " value=" + value+"("+(value>>16)+","+((value<<16)>>16)+")");
     }
 
     public boolean readCoil(int slave, int address) throws IOException, ModbusError {
