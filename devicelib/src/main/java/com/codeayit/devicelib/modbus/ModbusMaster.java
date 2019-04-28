@@ -38,7 +38,7 @@ public class ModbusMaster {
 
      public synchronized int[]  execute(int slave, int function_code, int starting_address, int quantity_of_x, int output_value) throws IOException, ModbusError {
 
-         Log.d(TAG,"开始执行 modbus ");
+//         Log.d(TAG,"开始执行 modbus ");
 
 
         if (slave < 0 || slave > 255) {
