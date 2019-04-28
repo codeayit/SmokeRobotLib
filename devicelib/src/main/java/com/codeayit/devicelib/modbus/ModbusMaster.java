@@ -1,5 +1,6 @@
 package com.codeayit.devicelib.modbus;
 
+import android.os.SystemClock;
 import android.util.Log;
 
 
@@ -14,6 +15,7 @@ import com.codeayit.devicelib.utilities.TimeoutUtil;
 
 import java.io.IOException;
 import java.util.BitSet;
+import java.util.concurrent.locks.Lock;
 
 import android_serialport_api.SerialPort;
 
@@ -34,7 +36,11 @@ public class ModbusMaster {
         this.timeout = timeout;
     }
 
-    synchronized public int[] execute(int slave, int function_code, int starting_address, int quantity_of_x, int output_value) throws IOException, ModbusError {
+     public synchronized int[]  execute(int slave, int function_code, int starting_address, int quantity_of_x, int output_value) throws IOException, ModbusError {
+
+         Log.d(TAG,"开始执行 modbus ");
+
+
         if (slave < 0 || slave > 255) {
             throw new ModbusError(ModbusErrorType.ModbusInvalidArgumentError, "Invalid slave " + slave);
         }
@@ -94,31 +100,52 @@ public class ModbusMaster {
         // 从设备接收反馈
         byte[] responseBytes;
         try (ByteArrayWriter response = new ByteArrayWriter()) {
-            ThreadUtil.sleep(100);
             final int finalExpected_length = expected_length;
             final boolean[] complete = new boolean[1];
-            boolean done = TimeoutUtil.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        byte[] bytes = new byte[64];
-                        while (!complete[0]) {
-                            if (port.getInputStream().available() > 0) {
-                                int len = port.getInputStream().read(bytes, 0, bytes.length);
-                                if (len > 0) {
-                                    response.write(bytes, 0, len);
-                                    if (response.size() >= finalExpected_length) {
-                                        break;
-                                    }
-                                }
+//            boolean done = TimeoutUtil.execute(new Runnable() {
+//                @Override
+//                public void run() {
+//                    try {
+//                        byte[] bytes = new byte[64];
+//                        while (!complete[0]) {
+//                            if (port.getInputStream().available() > 0) {
+//                                int len = port.getInputStream().read(bytes, 0, bytes.length);
+//                                if (len > 0) {
+//                                    response.write(bytes, 0, len);
+//                                    if (response.size() >= finalExpected_length) {
+//                                        break;
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    } catch (Exception ex) {
+//                        ex.printStackTrace();
+//                    }
+//                }
+//            }, timeout);
+            boolean done = true;
+            long startTime = System.currentTimeMillis();
+            try {
+                byte[] bytesTemp= new byte[64];
+                while (!complete[0]) {
+                    if (port.getInputStream().available() > 0) {
+                        int len = port.getInputStream().read(bytesTemp, 0, bytesTemp.length);
+                        if (len > 0) {
+                            response.write(bytesTemp, 0, len);
+                            if (response.size() >= finalExpected_length) {
+                                break;
                             }
-                            ThreadUtil.sleep(1);
                         }
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
                     }
+                    if (System.currentTimeMillis()-startTime>timeout){
+                        done = false;
+                        break;
+                    }
+                    SystemClock.sleep(50);
                 }
-            }, timeout);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
             complete[0] = true;
             response.flush();
             if (!done) {
@@ -126,7 +153,7 @@ public class ModbusMaster {
             }
             responseBytes = response.toByteArray();
             if (responseBytes.length != expected_length) {
-//                Log.d(TAG, "receive_temp:" + ByteUtil.ByteArrToHex(responseBytes));
+                Log.d(TAG, "receive_temp:" + ByteUtil.ByteArrToHex(responseBytes));
                 byte[] responseBytes_temp = new byte[expected_length];
                 for (int i = 0; i < responseBytes.length; i++) {
                     if (responseBytes[i] == slave) {
@@ -139,6 +166,8 @@ public class ModbusMaster {
                 responseBytes = responseBytes_temp;
             }
 //            Log.d(TAG, "receive:" + ByteUtil.ByteArrToHex(responseBytes));
+//            Log.d(TAG,"结束执行 modbus ");
+
         }
 
         if (responseBytes == null || responseBytes.length != expected_length) {

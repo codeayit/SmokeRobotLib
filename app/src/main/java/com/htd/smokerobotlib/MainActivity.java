@@ -1,5 +1,6 @@
 package com.htd.smokerobotlib;
 
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -21,10 +22,22 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             MbManager.getInstance().loadLibrary();
-            MbManager.getInstance().init(this,1,"/dev/ttyS2",115200);
+            MbManager.getInstance().init(this,1,"/dev/ttyS1",9600);
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+//               MbManager.getInstance().write_registers(50,3);
+               // MbManager.getInstance().write_registers(22,68);
+
+//                MbManager.getInstance().write_registers(22,69);
+
+            }
+        }).start();
     }
 
 
@@ -34,7 +47,9 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
 
 //               MbManager.getInstance().write_registers(50,3);
-                MbManager.getInstance().write_registers32(50,1245224);
+                //MbManager.getInstance().write_registers(22,68);
+
+//                MbManager.getInstance().write_registers(22,69);
 
             }
         }).start();
@@ -45,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
 
-                int i = MbManager.getInstance().read_registers(50);
+                int i = MbManager.getInstance().read_registers(66);
                 Log.d("klog","value = "+i);
 
 
